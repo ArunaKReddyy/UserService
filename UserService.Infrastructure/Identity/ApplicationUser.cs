@@ -7,7 +7,7 @@ public class ApplicationUser : IdentityUser<Guid>
     public bool IsActive { get; set; } = true;
     public string? FullName { get; set; }
     public string? ProfilePhotoUrl { get; set; }
-    public bool IsEmailConfirmed { get; set; }
+    //public bool IsEmailConfirmed { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public ICollection<Address> Addresses { get; set; } = [];
     //public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

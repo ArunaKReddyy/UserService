@@ -5,7 +5,12 @@ namespace UserService.Application.Services;
 
 public interface IUserService
 {
+    Task<bool> ChangePasswordAsync(Guid userId, string currentPassword, string newPassword);
+    Task<ForgotPasswordResponseDTO?> ForgotPasswordAsync(string email);
+    Task<ProfileDTO?> GetProfileAsync(Guid userId);
     Task<bool> RegisterUser(RegisterUserDTo registerUserDTo);
+    Task<bool> ResetPasswordAsync(Guid userId, string token, string newPassword);
     Task<EmailConfirmationTokenResponseDTO?> SendConfirmationEmailAsync(string email);
+    Task<bool> UpdateProfileAsync(UpdateProfileDTO dto);
     Task<bool> VerifyConfirmationEmailAsync(ConfirmEmailDTO dto);
 }

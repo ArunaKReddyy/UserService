@@ -51,7 +51,7 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
            Id = user.Id,
            UserName = user.UserName,
            Email = user.Email,
-           IsEmailConfirmed = user.IsEmailConfirmed,
+           //IsEmailConfirmed = user.IsEmailConfirmed,
            IsActive = user.IsActive,
            PhoneNumber = user.PhoneNumber,
            FullName = user.FullName,
@@ -69,7 +69,7 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
             Id = applicationUser.Id,
             UserName = applicationUser.UserName,
             Email = applicationUser.Email,
-            IsEmailConfirmed = applicationUser.IsEmailConfirmed,
+            //IsEmailConfirmed = applicationUser.IsEmailConfirmed,
             IsActive = applicationUser.IsActive,
             PhoneNumber = applicationUser.PhoneNumber,
             FullName = applicationUser.FullName,
@@ -111,4 +111,33 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
         return result.Succeeded;
     }
 
+    public async Task<string?> GeneratePasswordResetTokenAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return null;
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(appUser);
+        return token;
+    }
+
+    public async Task<bool> ResetPasswordAsync(User user, string token, string newPassword)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return false;
+
+        var result = await _userManager.ResetPasswordAsync(appUser, token, newPassword);
+        return result.Succeeded;
+    }
+
+    public async Task<bool> ChangePasswordAsync(User user, string currentPassword, string newPassword)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return false;
+
+        var result = await _userManager.ChangePasswordAsync(appUser, currentPassword, newPassword);
+        return result.Succeeded;
+    }
 }

@@ -67,6 +67,44 @@ namespace UserService.API.Controllers
                 return StatusCode(500, ApiResponse<string>.FailResponse("Error confirming email.", new List<string> { ex.Message }));
             }
         }
+
+        [HttpGet("profile/{userId}")]
+        [ProducesResponseType(typeof(ApiResponse<ProfileDTO>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse<string>), (int)HttpStatusCode.NotFound)]
+        public async Task<IActionResult> GetProfile(Guid userId)
+        {
+            try
+            {
+                var profile = await _userService.GetProfileAsync(userId);
+                if (profile == null)
+                    return NotFound(ApiResponse<string>.FailResponse("User profile not found."));
+
+                return Ok(ApiResponse<ProfileDTO>.SuccessResponse(profile));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<string>.FailResponse("Error fetching profile.", new List<string> { ex.Message }));
+            }
+        }
+
+        [HttpPut("profile")]
+        [ProducesResponseType(typeof(ApiResponse<string>), (int)HttpStatusCode.OK)]
+        [ProducesResponseType(typeof(ApiResponse<string>), (int)HttpStatusCode.BadRequest)]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDTO dto)
+        {
+            try
+            {
+                var success = await _userService.UpdateProfileAsync(dto);
+                if (!success)
+                    return BadRequest(ApiResponse<string>.FailResponse("Failed to update profile."));
+
+                return Ok(ApiResponse<string>.SuccessResponse("Profile updated successfully."));
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, ApiResponse<string>.FailResponse("Error updating profile.", new List<string> { ex.Message }));
+            }
+        }
     }
 
 }

@@ -12,4 +12,7 @@ public interface IUserRepository
     Task<string?> GenerateEmailConfirmationTokenAsync(User user);
     Task<bool> VerifyConfirmaionEmailAsync(User user, string token);
     Task<bool> UpdateUserAsync(User user);
+    Task<string?> GeneratePasswordResetTokenAsync(User user);
+    Task<bool> ResetPasswordAsync(User user, string token, string newPassword);
+    Task<bool> ChangePasswordAsync(User user, string currentPassword, string newPassword);
 }
