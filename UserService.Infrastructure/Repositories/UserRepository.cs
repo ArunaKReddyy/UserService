@@ -79,4 +79,36 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
             Addresses = applicationUser.Addresses.ToList()
         };
     }
+
+    public async Task<string?> GenerateEmailConfirmationTokenAsync(User user)
+    {
+        var applicationUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (applicationUser == null) return null;
+        return await _userManager.GenerateEmailConfirmationTokenAsync(applicationUser);
+    }
+    public async Task<bool> VerifyConfirmaionEmailAsync(User user, string token)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return false;
+
+        var result = await _userManager.ConfirmEmailAsync(appUser, token);
+        return result.Succeeded;
+    }
+    public async Task<bool> UpdateUserAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return false;
+
+        appUser.UserName = user.UserName;
+        appUser.Email = user.Email;
+        appUser.FullName = user.FullName;
+        appUser.PhoneNumber = user.PhoneNumber;
+        appUser.ProfilePhotoUrl = user.ProfilePhotoUrl;
+
+        var result = await _userManager.UpdateAsync(appUser);
+        return result.Succeeded;
+    }
+
 }

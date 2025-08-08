@@ -1,4 +1,5 @@
-﻿using UserService.Application.DTOs;
+﻿using UserService.Application.DTOs.Request;
+using UserService.Application.DTOs.Response;
 using UserService.Domain.Entities;
 using UserService.Domain.Interfaces;
 
@@ -31,5 +32,34 @@ public class UserService(IUserRepository userRepository) : IUserService
 
         await _userRepository.AssignRoleAsync(user, "Customer");
         return true;
+    }
+
+    public async Task<EmailConfirmationTokenResponseDTO?> SendConfirmationEmailAsync(string email)
+    {
+       var user= await _userRepository.FindByEmailAsync(email);
+        if (user == null) return null;
+
+        var result = await _userRepository.GenerateEmailConfirmationTokenAsync(user);
+        if (result == null) return null;
+        return new EmailConfirmationTokenResponseDTO
+        {
+            UserId = user.Id,
+            Token = result,
+        };
+    }
+
+    public async Task<bool> VerifyConfirmationEmailAsync(ConfirmEmailDTO dto)
+    {
+        var user = await _userRepository.FindByIdAsync(dto.UserId);
+        if (user == null)
+            return false;
+
+        var result = await _userRepository.VerifyConfirmaionEmailAsync(user, dto.Token);
+        //if (result)
+        //{
+        //    user.IsActive = true;
+        //    await _userRepository.UpdateUserAsync(user);
+        //}
+        return result;
     }
 }

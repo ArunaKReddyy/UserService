@@ -9,4 +9,7 @@ public interface IUserRepository
     Task<User?> FindByIdAsync(Guid id); 
     Task<bool> CreateUserAsync(User user, string password);
     Task<bool> AssignRoleAsync(User userId, string roleName);
+    Task<string?> GenerateEmailConfirmationTokenAsync(User user);
+    Task<bool> VerifyConfirmaionEmailAsync(User user, string token);
+    Task<bool> UpdateUserAsync(User user);
 }
