@@ -127,4 +127,67 @@ public class UserService(IUserRepository userRepository) : IUserService
         return await _userRepository.ResetPasswordAsync(user, token, newPassword);
     }
 
+    #region Address
+    public async Task<Guid> AddOrUpdateAddressAsync(AddressDTO dto)
+    {
+        var address = new Address
+        {
+            Id = dto.Id ?? Guid.NewGuid(),
+            UserId = dto.userId,
+            AddresLine1 = dto.AddressLine1,
+            AddresLine2 = dto.AddressLine2,
+            City = dto.City,
+            State = dto.State,
+            PostalCode = dto.PostalCode,
+            Country = dto.Country,
+            IsDefaultBilling = dto.IsDefaultBilling,
+            IsDefaultShipping = dto.IsDefaultShipping
+        };
+
+        var addressId = await _userRepository.AddOrUpdateAddressAsync(address);
+        return addressId;
+    }
+    public async Task<IEnumerable<AddressDTO>> GetAddressesAsync(Guid userId)
+    {
+        var addresses = await _userRepository.GetAddressesByUserIdAsync(userId);
+        return addresses.Select(a => new AddressDTO
+        {
+            Id = a.Id,
+            AddressLine1 = a.AddresLine1,
+            AddressLine2 = a.AddresLine2,
+            City = a.City,
+            State = a.State,
+            PostalCode = a.PostalCode,
+            Country = a.Country,
+            IsDefaultBilling = a.IsDefaultBilling,
+            IsDefaultShipping = a.IsDefaultShipping
+        });
+    }
+    public async Task<bool> DeleteAddressAsync(Guid userId, Guid addressId)
+    {
+        return await _userRepository.DeleteAddressAsync(userId, addressId);
+    }
+    public async Task<AddressDTO?> GetAddressByUserIdAndAddressIdAsync(Guid userId, Guid addressId)
+    {
+        var address = await _userRepository.GetAddressByUserIdAndAddressIdAsync(userId, addressId);
+        if (address != null)
+        {
+            return new AddressDTO
+            {
+                Id = address.Id,
+                AddressLine1 = address.AddresLine1,
+                AddressLine2 = address.AddresLine2,
+                City = address.City,
+                State = address.State,
+                PostalCode = address.PostalCode,
+                Country = address.Country,
+                IsDefaultBilling = address.IsDefaultBilling,
+                IsDefaultShipping = address.IsDefaultShipping
+            };
+        }
+
+        return null;
+    }
+
+    #endregion
 }

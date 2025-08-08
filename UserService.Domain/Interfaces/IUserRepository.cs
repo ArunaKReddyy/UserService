@@ -15,4 +15,8 @@ public interface IUserRepository
     Task<string?> GeneratePasswordResetTokenAsync(User user);
     Task<bool> ResetPasswordAsync(User user, string token, string newPassword);
     Task<bool> ChangePasswordAsync(User user, string currentPassword, string newPassword);
+    Task<Guid> AddOrUpdateAddressAsync(Address address);
+    Task<List<Address>> GetAddressesByUserIdAsync(Guid userId);
+    Task<bool> DeleteAddressAsync(Guid userId, Guid addressId);
+    Task<Address?> GetAddressByUserIdAndAddressIdAsync(Guid userId, Guid addressId);
 }

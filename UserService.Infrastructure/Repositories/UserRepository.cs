@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using UserService.Domain.Entities;
 using UserService.Domain.Interfaces;
 using UserService.Infrastructure.Identity;
@@ -38,28 +39,28 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
 
     public async Task<bool> AssignRoleAsync(User user, string roleName)
     {
-        var applicationUser =await _userManager.FindByIdAsync(user.Id.ToString());
+        var applicationUser = await _userManager.FindByIdAsync(user.Id.ToString());
         if (applicationUser == null) return false;
 
-       return (await _userManager.AddToRoleAsync(applicationUser, roleName)).Succeeded;
+        return (await _userManager.AddToRoleAsync(applicationUser, roleName)).Succeeded;
     }
 
     private static ApplicationUser MapToDomain(User user)
     {
-       return new ApplicationUser
-       {
-           Id = user.Id,
-           UserName = user.UserName,
-           Email = user.Email,
-           //IsEmailConfirmed = user.IsEmailConfirmed,
-           IsActive = user.IsActive,
-           PhoneNumber = user.PhoneNumber,
-           FullName = user.FullName,
-           ProfilePhotoUrl = user.ProfilePhotoUrl,
-           CreatedAt = user.CreatedAt,
-           LastLoginAt = user.LastLoginAt,
-           Addresses = [.. user.Addresses]
-       };
+        return new ApplicationUser
+        {
+            Id = user.Id,
+            UserName = user.UserName,
+            Email = user.Email,
+            //IsEmailConfirmed = user.IsEmailConfirmed,
+            IsActive = user.IsActive,
+            PhoneNumber = user.PhoneNumber,
+            FullName = user.FullName,
+            ProfilePhotoUrl = user.ProfilePhotoUrl,
+            CreatedAt = user.CreatedAt,
+            LastLoginAt = user.LastLoginAt,
+            Addresses = [.. user.Addresses]
+        };
     }
 
     private static User? MapToDomain(ApplicationUser applicationUser)
@@ -140,4 +141,51 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
         var result = await _userManager.ChangePasswordAsync(appUser, currentPassword, newPassword);
         return result.Succeeded;
     }
+
+    #region Address
+    public async Task<Guid> AddOrUpdateAddressAsync(Address address)
+    {
+        var existing = await _dbContext.Addresses.FindAsync(address.Id);
+        if (existing == null)
+        {
+            await _dbContext.Addresses.AddAsync(address);
+            await _dbContext.SaveChangesAsync();
+            return address.Id; // New address Id
+        }
+        else
+        {
+            existing.AddresLine1 = address.AddresLine1;
+            existing.AddresLine2 = address.AddresLine2;
+            existing.City = address.City;
+            existing.State = address.State;
+            existing.PostalCode = address.PostalCode;
+            existing.Country = address.Country;
+            existing.IsDefaultBilling = address.IsDefaultBilling;
+            existing.IsDefaultShipping = address.IsDefaultShipping;
+            await _dbContext.SaveChangesAsync();
+            return existing.Id; // Existing address Id
+        }
+    }
+    public async Task<Address?> GetAddressByUserIdAndAddressIdAsync(Guid userId, Guid addressId)
+    {
+        return await _dbContext.Addresses.
+            AsNoTracking()
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.Id == addressId);
+    }
+    public async Task<bool> DeleteAddressAsync(Guid userId, Guid addressId)
+    {
+        var address = await _dbContext.Addresses.FirstOrDefaultAsync(a => a.Id == addressId && a.UserId == userId);
+        if (address == null)
+            return false;
+
+        _dbContext.Addresses.Remove(address);
+        await _dbContext.SaveChangesAsync();
+        return true;
+    }
+    public async Task<List<Address>> GetAddressesByUserIdAsync(Guid userId)
+    {
+        return await _dbContext.Addresses.Where(a => a.UserId == userId).ToListAsync();
+    }
+
+    #endregion
 }
