@@ -12,8 +12,12 @@ public interface IUserService
     Task<AddressDTO> GetAddressByUserIdAndAddressIdAsync(Guid userId, Guid addressId);
     Task<IEnumerable<AddressDTO>> GetAddressesAsync(Guid userId);
     Task<ProfileDTO?> GetProfileAsync(Guid userId);
+    Task<bool> IsUserExistsAsync(Guid userId);
+    Task<LoginResponseDTO?> LoginAsync(LoginDTO dto, string iPAddress, string userAgent);
+    Task<RefreshTokenResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO dto, string iPAddress, string userAgent);
     Task<bool> RegisterUser(RegisterUserDTo registerUserDTo);
     Task<bool> ResetPasswordAsync(Guid userId, string token, string newPassword);
+    Task<bool> RevokeRefreshTokenAsync(string refreshToken, string v);
     Task<EmailConfirmationTokenResponseDTO?> SendConfirmationEmailAsync(string email);
     Task<bool> UpdateProfileAsync(UpdateProfileDTO dto);
     Task<bool> VerifyConfirmationEmailAsync(ConfirmEmailDTO dto);

@@ -1,13 +1,19 @@
-﻿using UserService.Application.DTOs.Request;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using UserService.Application.DTOs.Request;
 using UserService.Application.DTOs.Response;
 using UserService.Domain.Entities;
 using UserService.Domain.Interfaces;
 
 namespace UserService.Application.Services;
 
-public class UserService(IUserRepository userRepository) : IUserService
+public class UserService(IUserRepository userRepository , IConfiguration configuration) : IUserService
 {
     private readonly IUserRepository _userRepository = userRepository;
+    private readonly IConfiguration _configuration = configuration;
 
     public async Task<ProfileDTO?> GetProfileAsync(Guid userId)
     {
@@ -190,4 +196,174 @@ public class UserService(IUserRepository userRepository) : IUserService
     }
 
     #endregion
+    #region Login
+
+    public async Task<LoginResponseDTO> LoginAsync(LoginDTO dto, string ipAddress, string userAgent)
+    {
+        var response = new LoginResponseDTO();
+
+        // Validate Client
+        if (!await _userRepository.IsValidClientAsync(dto.ClientId))
+        {
+            response.ErrorMessage = "Invalid client ID.";
+            return response;
+        }
+
+        // Get user by email or username
+        var user = dto.EmailOrUserName.Contains("@")
+            ? await _userRepository.FindByEmailAsync(dto.EmailOrUserName)
+            : await _userRepository.FindByUserNameAsync(dto.EmailOrUserName);
+
+        if (user == null)
+        {
+            response.ErrorMessage = "Invalid username or password.";
+            return response;
+        }
+
+        // Check lockout info
+        if (await _userRepository.IsLockedOutAsync(user))
+        {
+            var lockoutEnd = await _userRepository.GetLockoutEndDateAsync(user);
+            if (lockoutEnd.HasValue && lockoutEnd > DateTime.UtcNow)
+            {
+                var timeLeft = lockoutEnd.Value - DateTime.UtcNow;
+                response.ErrorMessage = $"Account is locked. Try again after {timeLeft.Minutes} minute(s) and {timeLeft.Seconds} second(s).";
+                response.RemainingAttempts = 0;
+                return response;
+            }
+            else
+            {
+                await _userRepository.ResetAccessFailedCountAsync(user);
+            }
+        }
+
+        if (!user.IsEmailConfirmed)
+        {
+            response.ErrorMessage = "Email not confirmed. Please verify your email.";
+            return response;
+        }
+
+        // Validate password
+        var passwordValid = await _userRepository.CheckPasswordAsync(user, dto.Password);
+        if (!passwordValid)
+        {
+            await _userRepository.IncrementAccessFailedCountAsync(user);
+
+            if (await _userRepository.IsLockedOutAsync(user))
+            {
+                response.ErrorMessage = "Account locked due to multiple failed login attempts.";
+                response.RemainingAttempts = 0;
+                return response;
+            }
+
+            var maxAttempts = await _userRepository.GetMaxFailedAccessAttemptsAsync();
+            var failedCount = await _userRepository.GetAccessFailedCountAsync(user);
+            var attemptsLeft = maxAttempts - failedCount;
+
+            response.ErrorMessage = "Invalid username or password.";
+            response.RemainingAttempts = attemptsLeft > 0 ? attemptsLeft : 0;
+            return response;
+        }
+
+        await _userRepository.ResetAccessFailedCountAsync(user);
+
+        if (await _userRepository.IsTwoFactorEnabledAsync(user))
+        {
+            response.RequiresTwoFactor = true;
+            return response;
+        }
+
+        await _userRepository.UpdateLastLoginAsync(user, DateTime.UtcNow);
+
+        var roles = await _userRepository.GetUserRolesAsync(user);
+
+        response.Token = GenerateJwtToken(user, roles, dto.ClientId);
+        response.RefreshToken = await _userRepository.GenerateAndStoreRefreshTokenAsync(user.Id, dto.ClientId, userAgent, ipAddress);
+
+        return response;
+    }
+    private string GenerateJwtToken(User user, IList<string> roles, string clientId)
+    {
+        var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email ?? ""),
+                new Claim(ClaimTypes.Name, user.UserName ?? ""),
+                new Claim("client_id", clientId)
+            };
+
+        // Add role claims
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+        // Read JWT settings from configuration
+        var secretKey = _configuration["JwtSettings:SecretKey"];
+        var issuer = _configuration["JwtSettings:Issuer"];
+        var expiryMinutes = Convert.ToInt32(_configuration["JwtSettings:AccessTokenExpirationMinutes"]);
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var tokenDescriptor = new JwtSecurityToken(
+            issuer: issuer,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(expiryMinutes),
+            signingCredentials: creds
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(tokenDescriptor);
+    }
+    public async Task<bool> IsUserExistsAsync(Guid userId)
+    {
+        return await _userRepository.IsUserExistsAsync(userId);
+    }
+
+
+    public async Task<RefreshTokenResponseDTO> RefreshTokenAsync(RefreshTokenRequestDTO dto, string ipAddress, string userAgent)
+    {
+        var response = new RefreshTokenResponseDTO();
+
+        // Validate Client
+        if (!await _userRepository.IsValidClientAsync(dto.ClientId))
+        {
+            response.ErrorMessage = "Invalid client ID.";
+            return response;
+        }
+
+        var refreshTokenEntity = await _userRepository.GetRefreshTokenAsync(dto.RefreshToken);
+
+        if (refreshTokenEntity == null || !refreshTokenEntity.IsActive)
+        {
+            response.ErrorMessage = "Invalid or expired refresh token.";
+            return response;
+        }
+
+        // Revoke the old refresh token and generate a new one
+        var newRefreshToken = await _userRepository.GenerateAndStoreRefreshTokenAsync(refreshTokenEntity.UserId, dto.ClientId, userAgent, ipAddress);
+
+        var user = await _userRepository.FindByIdAsync(refreshTokenEntity.UserId);
+        if (user == null)
+        {
+            response.ErrorMessage = "User not found.";
+            return response;
+        }
+
+        var roles = await _userRepository.GetUserRolesAsync(user);
+
+        response.Token = GenerateJwtToken(user, roles, dto.ClientId);
+        response.RefreshToken = newRefreshToken;
+
+        return response;
+    }
+
+    public async Task<bool> RevokeRefreshTokenAsync(string token, string ipAddress)
+    {
+        var refreshToken = await _userRepository.GetRefreshTokenAsync(token);
+        if (refreshToken == null || !refreshToken.IsActive)
+            return false;
+
+        await _userRepository.RevokeRefreshTokenAsync(refreshToken, ipAddress);
+        return true;
+    }
+
+    #endregion]
 }

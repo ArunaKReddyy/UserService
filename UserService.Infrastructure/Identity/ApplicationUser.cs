@@ -10,5 +10,5 @@ public class ApplicationUser : IdentityUser<Guid>
     //public bool IsEmailConfirmed { get; set; }
     public DateTime? LastLoginAt { get; set; }
     public ICollection<Address> Addresses { get; set; } = [];
-    //public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+    public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

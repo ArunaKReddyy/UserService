@@ -70,7 +70,7 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
             Id = applicationUser.Id,
             UserName = applicationUser.UserName,
             Email = applicationUser.Email,
-            //IsEmailConfirmed = applicationUser.IsEmailConfirmed,
+            IsEmailConfirmed = applicationUser.EmailConfirmed,
             IsActive = applicationUser.IsActive,
             PhoneNumber = applicationUser.PhoneNumber,
             FullName = applicationUser.FullName,
@@ -187,5 +187,136 @@ public class UserRepository(UserManager<ApplicationUser> user, UserDbContext dbC
         return await _dbContext.Addresses.Where(a => a.UserId == userId).ToListAsync();
     }
 
+    #endregion
+
+    #region Login
+    public async Task<bool> IsLockedOutAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        return appUser != null && await _userManager.IsLockedOutAsync(appUser);
+    }
+
+    public async Task<bool> IsTwoFactorEnabledAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        return appUser != null && await _userManager.GetTwoFactorEnabledAsync(appUser);
+    }
+
+    public async Task IncrementAccessFailedCountAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser != null)
+            await _userManager.AccessFailedAsync(appUser);
+    }
+
+    public async Task ResetAccessFailedCountAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser != null)
+            await _userManager.ResetAccessFailedCountAsync(appUser);
+    }
+
+    public async Task<DateTime?> GetLockoutEndDateAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return null;
+
+        // LockoutEnd can be null, so return nullable DateTime
+        return appUser.LockoutEnd?.UtcDateTime;
+    }
+
+    public Task<int> GetMaxFailedAccessAttemptsAsync()
+    {
+        return Task.FromResult(_userManager.Options.Lockout.MaxFailedAccessAttempts);
+    }
+
+    public async Task<int> GetAccessFailedCountAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        return appUser?.AccessFailedCount ?? 0;
+    }
+
+    public async Task<bool> IsValidClientAsync(string clientId)
+    {
+        return await _dbContext.Clients.AnyAsync(c => c.ClientId == clientId);
+    }
+    public async Task<bool> CheckPasswordAsync(User user, string password)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return false;
+
+        return await _userManager.CheckPasswordAsync(appUser, password);
+    }
+    public async Task<IList<string>> GetUserRolesAsync(User user)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null)
+            return new List<string>();
+
+        return await _userManager.GetRolesAsync(appUser);
+    }
+    public async Task UpdateLastLoginAsync(User user, DateTime loginTime)
+    {
+        var appUser = await _userManager.FindByIdAsync(user.Id.ToString());
+        if (appUser == null) return;
+        appUser.LastLoginAt = loginTime;
+        await _userManager.UpdateAsync(appUser);
+    }
+
+    public async Task<string> GenerateAndStoreRefreshTokenAsync(Guid userId, string clientId, string userAgent, string ipAddress)
+    {
+        // Revoke existing tokens for this user/client/useragent before issuing a new one
+        await RevokeAllRefreshTokensAsync(userId, clientId, userAgent, ipAddress);
+
+        var refreshToken = new RefreshToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            ClientId = clientId,
+            UserAgent = userAgent,
+            Token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
+            CreatedByIp = ipAddress
+        };
+
+        _dbContext.RefreshTokens.Add(refreshToken);
+        await _dbContext.SaveChangesAsync();
+
+        return refreshToken.Token;
+    }
+    public async Task RevokeRefreshTokenAsync(RefreshToken refreshToken, string ipAddress)
+    {
+        refreshToken.RevokedAt = DateTime.UtcNow;
+        refreshToken.RevokedByIp = ipAddress;
+        await _dbContext.SaveChangesAsync();
+    }
+    private async Task RevokeAllRefreshTokensAsync(Guid userId, string clientId, string userAgent, string revokedByIp)
+    {
+        var tokens = await _dbContext.RefreshTokens
+            .Where(t => t.UserId == userId
+                && t.ClientId == clientId
+                && t.UserAgent == userAgent
+                && t.RevokedAt == null)
+            .ToListAsync();
+
+        foreach (var token in tokens)
+        {
+            token.RevokedAt = DateTime.UtcNow;
+            token.RevokedByIp = revokedByIp;
+        }
+
+        await _dbContext.SaveChangesAsync();
+    }
+    public async Task<bool> IsUserExistsAsync(Guid userId)
+    {
+        return await _dbContext.Users.AsNoTracking().AnyAsync(u => u.Id == userId);
+    }
+    public async Task<RefreshToken?> GetRefreshTokenAsync(string token)
+    {
+        return await _dbContext.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == token);
+    }
     #endregion
 }

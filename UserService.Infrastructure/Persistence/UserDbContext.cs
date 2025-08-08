@@ -10,6 +10,9 @@ public class UserDbContext(DbContextOptions<UserDbContext> options) : IdentityDb
 {
     public DbSet<Address> Addresses { get; set; } = null!;
 
+    public DbSet<Client> Clients { get; set; } = null!;
+
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -22,6 +25,17 @@ public class UserDbContext(DbContextOptions<UserDbContext> options) : IdentityDb
                 .IsRequired()
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        builder.Entity<RefreshToken>(entity =>
+        {
+            // Configure foreign key explicitly, ensure EF uses the existing UserId column:
+            entity.HasOne<ApplicationUser>() // Navigation to ApplicationUser
+                .WithMany(u => u.RefreshTokens) // Collection navigation on ApplicationUser
+                .HasForeignKey(rt => rt.UserId) // Explicit FK property
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         // Rename Identity tables here:
         builder.Entity<ApplicationUser>().ToTable("Users");
         builder.Entity<ApplicationRole>().ToTable("Roles");
@@ -59,10 +73,10 @@ public class UserDbContext(DbContextOptions<UserDbContext> options) : IdentityDb
            }
        );
 
-        //builder.Entity<Client>().HasData(
-        //    new Client { ClientId = "web", ClientName = "Web Client", Description = "Web browser clients", IsActive = true },
-        //    new Client { ClientId = "android", ClientName = "Android Client", Description = "Android mobile app", IsActive = true },
-        //    new Client { ClientId = "ios", ClientName = "iOS Client", Description = "iOS mobile app", IsActive = true }
-        //);
+        builder.Entity<Client>().HasData(
+            new Client { ClientId = "web", ClientName = "Web Client", Description = "Web browser clients", IsActive = true },
+            new Client { ClientId = "android", ClientName = "Android Client", Description = "Android mobile app", IsActive = true },
+            new Client { ClientId = "ios", ClientName = "iOS Client", Description = "iOS mobile app", IsActive = true }
+        );
     }
 }

@@ -19,4 +19,19 @@ public interface IUserRepository
     Task<List<Address>> GetAddressesByUserIdAsync(Guid userId);
     Task<bool> DeleteAddressAsync(Guid userId, Guid addressId);
     Task<Address?> GetAddressByUserIdAndAddressIdAsync(Guid userId, Guid addressId);
+    Task<bool> IsValidClientAsync(string clientId);
+    Task<bool> IsLockedOutAsync(User user);
+    Task<DateTime?> GetLockoutEndDateAsync(User user);
+    Task ResetAccessFailedCountAsync(User user);
+    Task<bool> CheckPasswordAsync(User user, string password);
+    Task IncrementAccessFailedCountAsync(User user);
+    Task<int> GetMaxFailedAccessAttemptsAsync();
+    Task<int> GetAccessFailedCountAsync(User user);
+    Task<bool> IsTwoFactorEnabledAsync(User user);
+    Task UpdateLastLoginAsync(User user, DateTime utcNow);
+    Task<IList<string>> GetUserRolesAsync(User user);
+    Task<string?> GenerateAndStoreRefreshTokenAsync(Guid id, string clientId, string userAgent, string ipAddress);
+    Task<bool> IsUserExistsAsync(Guid userId);
+    Task<RefreshToken?> GetRefreshTokenAsync(string token);
+    Task RevokeRefreshTokenAsync(RefreshToken refreshToken, string ipAddress);
 }

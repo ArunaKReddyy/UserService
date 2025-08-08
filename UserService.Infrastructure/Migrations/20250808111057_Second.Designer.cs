@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using UserService.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using UserService.Infrastructure.Persistence;
 namespace UserService.Infrastructure.Migrations
 {
     [DbContext(typeof(UserDbContext))]
-    partial class UserDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250808111057_Second")]
+    partial class Second
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -192,29 +195,6 @@ namespace UserService.Infrastructure.Migrations
                     b.HasKey("ClientId");
 
                     b.ToTable("Clients");
-
-                    b.HasData(
-                        new
-                        {
-                            ClientId = "web",
-                            ClientName = "Web Client",
-                            Description = "Web browser clients",
-                            IsActive = true
-                        },
-                        new
-                        {
-                            ClientId = "android",
-                            ClientName = "Android Client",
-                            Description = "Android mobile app",
-                            IsActive = true
-                        },
-                        new
-                        {
-                            ClientId = "ios",
-                            ClientName = "iOS Client",
-                            Description = "iOS mobile app",
-                            IsActive = true
-                        });
                 });
 
             modelBuilder.Entity("UserService.Domain.Entities.RefreshToken", b =>
